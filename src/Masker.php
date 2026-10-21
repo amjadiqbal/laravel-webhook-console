@@ -78,16 +78,19 @@ final class Masker
             $text = str_replace($values, self::MASK, $text);
         }
 
+        // Bearer/Basic credentials first, so "Authorization: Bearer x" keeps its scheme and hides x.
+        $text = (string) preg_replace('/\b(Bearer|Basic|Token)\s+(?!'.preg_quote(self::MASK, '/').')[A-Za-z0-9._~+\/=-]{4,}/i', '$1 '.self::MASK, $text);
+
         if ($this->words !== []) {
             $words = implode('|', array_map(fn (string $w): string => preg_quote($w, '/'), $this->words));
             $text = (string) preg_replace(
-                '/((?:[\w.-]*(?:'.$words.')[\w.-]*)["\']?\s*[:=]\s*["\']?)(?!'.preg_quote(self::MASK, '/').')[^\s"\'&,;}\]]+/iu',
+                '/((?:[\w.-]*(?:'.$words.')[\w.-]*)["\']?\s*[:=]\s*["\']?(?:(?:Bearer|Basic|Token)\s+)?+)(?!'.preg_quote(self::MASK, '/').')[^\s"\'&,;}\]]+/iu',
                 '$1'.self::MASK,
                 $text,
             );
         }
 
-        return (string) preg_replace('/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/=-]{4,}/', '$1 '.self::MASK, $text);
+        return $text;
     }
 
     public function isSecret(string|int $key): bool

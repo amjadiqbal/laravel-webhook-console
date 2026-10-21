@@ -137,6 +137,8 @@ it('masks free text by value, by key=value pair and by bearer token', function (
     expect($masker->text('key whsec_SIGNING, password=hunter22 and "api_key": "k_123" token: t_9 Bearer abc.def', ['cus_secret']))
         ->toBe('key '.Masker::MASK.', password='.Masker::MASK.' and "api_key": "'.Masker::MASK.'" token: '.Masker::MASK.' Bearer '.Masker::MASK)
         ->and($masker->text('nothing secret here for cus_secret', ['cus_secret']))->toBe('nothing secret here for '.Masker::MASK)
+        ->and((new Masker(['authorization', 'password']))->text('rejected (password=pw_1, Authorization: Bearer tok_BEARER, authorization=Basic dXNlcjpw)'))
+        ->toBe('rejected (password='.Masker::MASK.', Authorization: Bearer '.Masker::MASK.', authorization=Basic '.Masker::MASK.')')
         ->and($masker->secretsOf(['a' => ['password' => 'p_1234'], 'b' => 'visible'], ['x-token' => ['t_1234']], 'https://x.test/?api_key=k_1234&b=2'))
         ->toBe(['p_1234', 't_1234', 'k_1234']);
 });

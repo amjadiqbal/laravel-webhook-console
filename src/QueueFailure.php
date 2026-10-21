@@ -18,9 +18,11 @@ final readonly class QueueFailure
         public CarbonImmutable $failedAt,
     ) {}
 
-    /** The first line of the stored exception, which holds its class and message. */
+    /** The exception class and message: the first line of the stored text, without its " in /file.php:12". */
     public function message(): string
     {
-        return trim(strtok($this->exception, "\n") ?: $this->exception);
+        $line = trim(strtok($this->exception, "\n") ?: $this->exception);
+
+        return (string) preg_replace('/ in \S+:\d+$/', '', $line);
     }
 }

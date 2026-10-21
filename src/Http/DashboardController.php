@@ -23,7 +23,7 @@ final class DashboardController
         $query = $console->query($source, $filters);
         // Everything but attachments, which hold whole uploaded files as base64.
         $calls = $query
-            ->select(array_map(fn (string $c): string => $query->getModel()->qualifyColumn($c), [$query->getModel()->getKeyName(), 'name', 'url', 'payload', 'exception', 'created_at', 'updated_at']))
+            ->select(array_map(fn (string $c): string => $query->getModel()->qualifyColumn($c), [$query->getModel()->getKeyName(), 'name', 'url', 'headers', 'payload', 'exception', 'created_at', 'updated_at']))
             ->paginate($perPage)
             ->withQueryString();
 

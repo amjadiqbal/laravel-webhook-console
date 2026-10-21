@@ -62,7 +62,7 @@ it('links a job that failed on a queue worker to its call through failed_jobs', 
 
     expect($failed->exception)->toBeNull() // webhook-client itself never sees this failure
         ->and($console->status($failed))->toBe(Status::QueueFailed)
-        ->and($console->activeQueueFailure($failed)?->message())->toContain('Upstream API timed out for push')
+        ->and($console->activeQueueFailure($failed)?->message())->toBe('RuntimeException: Upstream API timed out for push')
         ->and($console->status($fine))->toBe(Status::Ok)
         ->and($console->activeQueueFailureIds('webhook_calls'))->toBe([(string) $failed->id]);
 });
@@ -74,6 +74,18 @@ it('parses the call id from a failed job payload without unserializing it', func
     expect(app(FailedJobs::class)->parse((string) $payload))->toBe(['job' => ThrowingJob::class, 'model' => WebhookCall::class, 'id' => '42'])
         ->and(app(FailedJobs::class)->parse((string) json_encode(['displayName' => 'App\\Jobs\\Other', 'data' => ['command' => $command]])))->toBeNull()
         ->and(app(FailedJobs::class)->parse('not json'))->toBeNull();
+});
+
+it('reads the event name from provider headers before the payload', function () {
+    $console = app(WebhookConsole::class);
+    $github = new WebhookCall(['headers' => ['x-github-event' => ['pull_request']], 'payload' => ['action' => 'opened']]);
+    $push = new WebhookCall(['headers' => ['x-github-event' => ['push']], 'payload' => ['ref' => 'refs/heads/main']]);
+    $paddle = new WebhookCall(['headers' => [], 'payload' => ['event_type' => 'transaction.completed']]);
+
+    expect($console->event($github))->toBe('pull_request.opened')
+        ->and($console->event($push))->toBe('push')
+        ->and($console->event($paddle))->toBe('transaction.completed')
+        ->and($console->event(new WebhookCall(['payload' => ['id' => 1]])))->toBeNull();
 });
 
 it('says why failed_jobs cannot be read', function () {

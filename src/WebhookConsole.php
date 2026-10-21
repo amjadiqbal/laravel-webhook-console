@@ -141,9 +141,24 @@ final class WebhookConsole
         return $query->orderByDesc($key);
     }
 
-    /** The event name most providers put at the top of the payload (Stripe "type", GitHub "action"...). */
+    /**
+     * The event name: from the header providers send it in (GitHub, GitLab, Shopify, Bitbucket), when
+     * stored, else from the top of the payload (Stripe "type", Paddle "event_type", GitHub "action"...).
+     */
     public function event(WebhookCall $call): ?string
     {
+        $headers = is_array($call->headers) ? array_change_key_case($call->headers) : [];
+
+        foreach (['x-github-event', 'x-gitlab-event', 'x-shopify-topic', 'x-event-key'] as $name) {
+            $value = $headers[$name][0] ?? $headers[$name] ?? null;
+
+            if (is_scalar($value) && $value !== '') {
+                $action = is_array($call->payload) && is_scalar($call->payload['action'] ?? null) ? '.'.$call->payload['action'] : '';
+
+                return mb_strimwidth($value.$action, 0, 60, '…');
+            }
+        }
+
         $payload = $call->payload;
 
         foreach (['type', 'event', 'event_type', 'eventType', 'event_name', 'topic', 'object_kind', 'action'] as $key) {

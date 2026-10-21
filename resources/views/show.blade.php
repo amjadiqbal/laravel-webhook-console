@@ -42,9 +42,9 @@
     @if (is_array($call->exception))
         <div class="panel" style="border-left:4px solid var(--critical)">
             <div class="ph"><h2>Stored exception</h2><span class="muted" style="font-size:13px">code {{ $call->exception['code'] ?? 0 }}</span></div>
-            <p style="margin:0 0 10px;font-weight:600;word-break:break-word">{{ $call->exception['message'] ?? '' }}</p>
+            <p style="margin:0 0 10px;font-weight:600;word-break:break-word">{{ $console->maskText($call, (string) ($call->exception['message'] ?? '')) }}</p>
             @if (! empty($call->exception['trace']))
-                <details><summary>Stack trace</summary><pre class="code wrap-lines" style="margin-top:8px">{{ $call->exception['trace'] }}</pre></details>
+                <details><summary>Stack trace</summary><pre class="code wrap-lines" style="margin-top:8px">{{ $console->maskText($call, (string) $call->exception['trace']) }}</pre></details>
             @endif
         </div>
     @endif
@@ -55,11 +55,13 @@
                 <h2>{{ $queueFailureActive ? 'Failed in queue' : 'Earlier queue failure (replayed since)' }}</h2>
                 <span class="muted" style="font-size:13px">{{ $queueFailure->failedAt }} · {{ $queueFailure->connection }}/{{ $queueFailure->queue }}</span>
             </div>
-            <p style="margin:0 0 10px;font-weight:600;word-break:break-word">{{ $queueFailure->message() }}</p>
-            <details><summary>Exception from failed_jobs <span class="mono">{{ $queueFailure->id }}</span></summary><pre class="code wrap-lines" style="margin-top:8px">{{ $queueFailure->exception }}</pre></details>
+            <p style="margin:0 0 10px;font-weight:600;word-break:break-word">{{ $console->maskText($call, $queueFailure->message()) }}</p>
+            <details><summary>Exception from failed_jobs <span class="mono">{{ $queueFailure->id }}</span></summary><pre class="code wrap-lines" style="margin-top:8px">{{ $console->maskText($call, $queueFailure->exception) }}</pre></details>
         </div>
     @elseif ($failedJobsProblem)
         <div class="note">failed_jobs is not read: {{ $failedJobsProblem }}</div>
+    @elseif ($console->failedJobsLimited())
+        <div class="note">Only the newest {{ number_format((int) config('webhook-console.failed_jobs.scan_limit', 1000)) }} failed_jobs rows were checked, so an older queue failure of this call would not show here. Raise failed_jobs.scan_limit, or clear old rows with <code>php artisan queue:prune-failed</code>.</div>
     @endif
 
     <div class="grid2">

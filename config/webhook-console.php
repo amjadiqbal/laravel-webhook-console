@@ -7,13 +7,18 @@ return [
     | Dashboard
     |--------------------------------------------------------------------------
     |
-    | The dashboard is served at /{path}. Three gates decide who may do what,
-    | and each allows the local environment only until you define it yourself
+    | The dashboard is served at /{path}. Three gates decide who may do what
     | (see the README):
     |
     |   viewWebhookConsole    see calls, payloads, headers and failures
+    |                         default: the local environment only
     |   replayWebhookCalls    replay one call or bulk-retry failed calls
+    |                         default: denied until you define it
     |   pruneWebhookCalls     delete calls older than a number of days
+    |                         default: denied until you define it
+    |
+    | Replay and prune also need a signed-in user unless you set
+    | actions_require_user to false (for an app without authentication).
     |
     | The view gate is always checked after the middleware below, so emptying
     | this list cannot expose the dashboard.
@@ -26,6 +31,7 @@ return [
         'domain' => env('WEBHOOK_CONSOLE_DOMAIN'),
         'middleware' => ['web'],
         'per_page' => 50,
+        'actions_require_user' => true,
     ],
 
     /*
@@ -36,7 +42,10 @@ return [
     | Payload keys, header names and URL query parameters whose name contains
     | one of these words (case-insensitive) are shown as "••••••". The
     | signature header of every webhook-client config is always masked too.
-    | Masking applies everywhere: the dashboard, copy buttons and artisan.
+    | Exception messages, stack traces and failed_jobs text are masked as
+    | well: every secret value of the call, every signing secret, key=value
+    | pairs with these words, and bearer tokens. Masking applies everywhere:
+    | the dashboard, copy buttons, search and artisan.
     |
     */
 
@@ -63,6 +72,21 @@ return [
     'failed_jobs' => [
         'enabled' => true,
         'scan_limit' => 1000,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Search
+    |--------------------------------------------------------------------------
+    |
+    | Searching the payload and URL matches against the masked values only, so
+    | a secret cannot be confirmed by guessing it. The database narrows the
+    | candidates first; this is how many of the newest candidates are checked.
+    |
+    */
+
+    'search' => [
+        'scan_limit' => 2000,
     ],
 
     /*

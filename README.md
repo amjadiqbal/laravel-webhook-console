@@ -13,7 +13,8 @@ a gated dashboard that lists your Stripe, GitHub, Shopify or any other webhooks 
 shows each payload and its headers **with secrets masked**, shows **why a webhook failed**, and lets you
 **replay one call or bulk-retry every failure** with a click or from artisan.
 
-It is read-only by default. Replay and prune each sit behind their own gate.
+It is read-only by default: out of the box the dashboard opens in the `local` environment only, and replay
+and prune stay off everywhere until you define their gates for signed-in users.
 
 Docs and demo: https://amjad.com.pk/laravel/packages/laravel-webhook-console
 
@@ -58,11 +59,12 @@ id, read with a regex and never unserialized), so every call has one of three st
 
 | Gate | Allows | Default |
 |---|---|---|
-| `viewWebhookConsole` | the dashboard, payloads, headers, failures | local environment only |
-| `replayWebhookCalls` | Replay, Replay selected, Retry failed | local environment only |
-| `pruneWebhookCalls` | deleting old calls from the dashboard | local environment only |
+| `viewWebhookConsole` | the dashboard, payloads, headers, failures | allowed in the `local` environment only |
+| `replayWebhookCalls` | Replay, Replay selected, Retry failed | **denied** until you define it |
+| `pruneWebhookCalls` | deleting old calls from the dashboard | **denied** until you define it |
 
-Outside `local`, nobody gets in until you define the gates, for example in `AppServiceProvider::boot()`:
+Out of the box you can look at your webhooks locally and change nothing. Outside `local` nobody gets in, and
+nobody can replay or prune anywhere, until you define the gates, for example in `AppServiceProvider::boot()`:
 
 ```php
 use App\Models\User;
@@ -73,15 +75,18 @@ Gate::define('replayWebhookCalls', fn (User $user) => $user->is_admin);
 Gate::define('pruneWebhookCalls', fn (User $user) => false); // view and replay only
 ```
 
-A guest never passes a gate that type-hints `User`. Someone who can view but not replay sees the dashboard
-in read-only mode, without the replay buttons; the replay and prune routes return 403 for them.
+Replay and prune also require a signed-in user, whatever the gate says. For a local app with no
+authentication at all, set `dashboard.actions_require_user` to `false` and define the gates with a nullable
+user (`fn ($user = null) => app()->isLocal()`). A guest never passes a gate that type-hints `User`. Someone
+who can view but not replay sees the dashboard in read-only mode, without the replay buttons; the replay and
+prune routes return 403 for them.
 
 ## What you can do
 
 **List and filter.** Every stored call with its config name, event (Stripe's `type`, GitHub's `action`,
 Shopify's `topic`...), status, error and age. Filter by config, status, date range, or search inside the
-payload and URL (an event id, a customer email, an order number). Works on MySQL, MariaDB, PostgreSQL and
-SQLite.
+payload and URL (an event id, a customer email, an order number). Search matches what the dashboard shows,
+so masked secrets can't be found by guessing them. Works on MySQL, MariaDB, PostgreSQL and SQLite.
 
 **Inspect one call.** The payload as pretty JSON with a copy button, the stored headers, uploaded file names
 and sizes (never their content), the stored exception with its stack trace, and the `failed_jobs` exception
@@ -90,7 +95,10 @@ for queue failures.
 **Masking.** Payload keys, header names and URL query parameters whose name contains `password`, `secret`,
 `token`, `authorization`, `signature`, `api_key`, `cookie`, `card_number`, `cvc`, `iban` and similar are
 shown as `••••••`, at any depth. The signature header of every webhook-client config is always masked. The
-list is in the config file. Masked values stay masked in the copy button too.
+list is in the config file. The same secrets are masked inside free text too: stored exception messages,
+stack traces and `failed_jobs` exceptions, where every secret value of the call, every webhook-client
+signing secret, `secret_key=value` style pairs and bearer tokens are hidden. Masking applies in the copy
+button and in artisan output as well.
 
 **Replay.** Dispatches the call's configured `process_webhook_job` again, exactly as webhook-client does for a
 new webhook: the job from the call's config, `clearException()`, `dispatch()`, and `saveException()` if
@@ -101,9 +109,10 @@ handlers already are, because providers retry too).
 **Bulk retry.** Tick calls and click *Replay selected*, or click *Retry failed* to replay every failure that
 matches the current filters (up to `bulk_limit`, 100 by default). Calls are replayed oldest first.
 
-**Prune.** Delete calls older than N days, for all configs or one. webhook-client can also do this on a
-schedule with `php artisan model:prune --model="Spatie\WebhookClient\Models\WebhookCall"`, using its
-`delete_after_days` setting.
+**Prune.** Delete calls older than N days, for all configs or one, from the dashboard or with
+`php artisan webhooks:prune`. Both are a mass delete, like webhook-client's own pruning: no model events fire.
+webhook-client can also prune on a schedule itself with
+`php artisan model:prune --model="Spatie\WebhookClient\Models\WebhookCall"`, using its `delete_after_days`.
 
 ## Artisan
 
@@ -115,14 +124,26 @@ php artisan webhooks:failed --name=stripe --json
 php artisan webhooks:replay 41 42                 # replay these calls
 php artisan webhooks:replay --failed --dry-run    # what would be replayed
 php artisan webhooks:replay --failed --since=2h --force
+
+php artisan webhooks:prune --days=30 --force      # delete calls older than 30 days
+php artisan webhooks:prune --name=github --pretend # count only (default days: webhook-client delete_after_days)
 ```
 
-`webhooks:replay` asks before replaying; non-interactive runs need `--force`. It exits 1 when any replay
-could not be dispatched, so it is safe to use in scripts. To be told about failures, schedule the check:
+`webhooks:replay` and `webhooks:prune` ask before acting; non-interactive and scheduled runs need `--force`.
+Exit codes, so they are safe in scripts:
+
+| Command | 0 | 1 | 2 |
+|---|---|---|---|
+| `webhooks:failed` | always, without `--strict` | `--strict` and a failure was found | bad `--since` |
+| `webhooks:replay` | every call dispatched, nothing to replay, or `--dry-run` | a call failed to dispatch or was skipped (its config is gone or has no job), or you answered no | no IDs and no `--failed`, or bad `--since` |
+| `webhooks:prune` | deleted, nothing to delete, or `--pretend` | you answered no | no usable `--days` |
+
+To be told about failures and keep the table small, schedule both:
 
 ```php
 // routes/console.php
 Schedule::command('webhooks:failed --since=1h --strict')->hourly()->emailOutputOnFailure('ops@example.com');
+Schedule::command('webhooks:prune --days=30 --force')->daily();
 ```
 
 ## Custom webhook models
@@ -148,9 +169,11 @@ php artisan vendor:publish --tag=webhook-console-config
 | `dashboard.domain` | `null` (`WEBHOOK_CONSOLE_DOMAIN`) | |
 | `dashboard.middleware` | `['web']` | the view gate is always added after these |
 | `dashboard.per_page` | `50` | |
+| `dashboard.actions_require_user` | `true` | replay and prune need a signed-in user |
 | `mask` | password, secret, token, ... | words matched inside key and header names |
 | `failed_jobs.enabled` | `true` | read `failed_jobs` for queue failures |
-| `failed_jobs.scan_limit` | `1000` | newest `failed_jobs` rows read per request |
+| `failed_jobs.scan_limit` | `1000` | newest `failed_jobs` rows read per request; the dashboard and `webhooks:failed` say so when there are more |
+| `search.scan_limit` | `2000` | newest matching calls checked per search; the dashboard says so when there are more |
 | `bulk_limit` | `100` | the most calls one bulk retry replays |
 
 The views can be published with `--tag=webhook-console-views`.

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace AmjadIqbal\WebhookConsole;
 
 use AmjadIqbal\WebhookConsole\Console\FailedCommand;
+use AmjadIqbal\WebhookConsole\Console\PruneCommand;
 use AmjadIqbal\WebhookConsole\Console\ReplayCommand;
 use AmjadIqbal\WebhookConsole\Http\ActionController;
 use AmjadIqbal\WebhookConsole\Http\Authorize;
@@ -34,13 +35,18 @@ final class WebhookConsoleServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->publishes([__DIR__.'/../config/webhook-console.php' => config_path('webhook-console.php')], 'webhook-console-config');
             $this->publishes([__DIR__.'/../resources/views' => resource_path('views/vendor/webhook-console')], 'webhook-console-views');
-            $this->commands([FailedCommand::class, ReplayCommand::class]);
+            $this->commands([FailedCommand::class, ReplayCommand::class, PruneCommand::class]);
         }
 
-        // Local only until the app defines its own gates (app providers boot after this one, so theirs win).
-        foreach (self::GATES as $gate) {
+        // Defaults until the app defines its own gates (app providers boot after this one, so theirs win):
+        // viewing is allowed in the local environment only; replay and prune are denied everywhere.
+        if (! Gate::has('viewWebhookConsole')) {
+            Gate::define('viewWebhookConsole', fn ($user = null): bool => $this->app->environment('local'));
+        }
+
+        foreach (['replayWebhookCalls', 'pruneWebhookCalls'] as $gate) {
             if (! Gate::has($gate)) {
-                Gate::define($gate, fn ($user = null): bool => $this->app->environment('local'));
+                Gate::define($gate, fn ($user = null): bool => false);
             }
         }
 

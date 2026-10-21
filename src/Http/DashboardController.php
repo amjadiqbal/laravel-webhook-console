@@ -10,7 +10,6 @@ use AmjadIqbal\WebhookConsole\WebhookConsoleServiceProvider;
 use Illuminate\Contracts\View\Factory;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 
 final class DashboardController
 {
@@ -74,8 +73,8 @@ final class DashboardController
             'console' => $console,
             'source' => $source,
             'sources' => array_keys($console->sources()),
-            'canReplay' => Gate::check('replayWebhookCalls', [$request]),
-            'canPrune' => Gate::check('pruneWebhookCalls', [$request]),
+            'canReplay' => Authorize::allowsAction($request, 'replayWebhookCalls'),
+            'canPrune' => Authorize::allowsAction($request, 'pruneWebhookCalls'),
             'version' => WebhookConsoleServiceProvider::version(),
         ];
     }

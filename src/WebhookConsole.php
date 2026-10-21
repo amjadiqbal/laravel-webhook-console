@@ -20,6 +20,14 @@ final class WebhookConsole
     /** @var array<string, list<string>> */
     private array $activeQueueFailures = [];
 
+    /** @var array<string, array<string, list<string>>> */
+    private array $searchIds = [];
+
+    /** @var array<string, bool> */
+    private array $searchLimited = [];
+
+    private ?Masker $masker = null;
+
     public function __construct(
         private readonly Config $config,
         private readonly FailedJobs $failedJobs,
@@ -123,9 +131,7 @@ final class WebhookConsole
         }
 
         if ($filters->search !== null) {
-            $like = '%'.$filters->search.'%';
-            $payload = $query->getModel()->getConnection()->getDriverName() === 'pgsql' ? 'CAST(payload AS TEXT)' : 'payload';
-            $query->where(fn (Builder $q) => $q->whereRaw("{$payload} LIKE ?", [$like])->orWhere('url', 'like', $like));
+            $query->whereIn($key, $this->searchIds($table, $filters->search));
         }
 
         $queueFailed = in_array($filters->status, ['failures', 'queue_failed', 'ok'], true) ? $this->activeQueueFailureIds($table) : [];
@@ -282,14 +288,90 @@ final class WebhookConsole
 
     public function masker(): Masker
     {
+        if ($this->masker !== null) {
+            return $this->masker;
+        }
+
         $signatureHeaders = array_values(array_filter(array_map(
             fn (Endpoint $e): string => $e->signatureHeader,
             $this->endpoints(),
         )));
 
+        // Signing secrets are hidden wherever they show up in free text, e.g. a dumped config in a trace.
+        $signingSecrets = [];
+        foreach ((array) $this->config->get('webhook-client.configs', []) as $config) {
+            if (is_array($config) && is_string($config['signing_secret'] ?? null) && $config['signing_secret'] !== '') {
+                $signingSecrets[] = $config['signing_secret'];
+            }
+        }
+
         /** @var list<string> $words */
         $words = array_values(array_filter((array) $this->config->get('webhook-console.mask', []), 'is_string'));
 
-        return new Masker($words, $signatureHeaders);
+        return $this->masker = new Masker($words, $signatureHeaders, $signingSecrets);
+    }
+
+    /** Free text about a call (exception message, trace, failed_jobs text) with its secrets masked. */
+    public function maskText(WebhookCall $call, string $text): string
+    {
+        $masker = $this->masker();
+
+        return $masker->text($text, $masker->secretsOf($call->payload, $call->headers, (string) $call->url));
+    }
+
+    /**
+     * IDs of calls whose masked payload or masked URL contains $term. The database narrows the
+     * candidates with LIKE on the raw columns; each candidate is then checked again on its masked form,
+     * so a term that only matches a secret value finds nothing. Reads at most search.scan_limit rows.
+     *
+     * @return list<string>
+     */
+    public function searchIds(string $table, string $term): array
+    {
+        $table = $this->source($table);
+
+        if (isset($this->searchIds[$table][$term])) {
+            return $this->searchIds[$table][$term];
+        }
+
+        $query = $this->newQuery($table);
+        $model = $query->getModel();
+        $like = '%'.$term.'%';
+        $payload = $model->getConnection()->getDriverName() === 'pgsql' ? 'CAST(payload AS TEXT)' : 'payload';
+        $limit = max(1, (int) $this->config->get('webhook-console.search.scan_limit', 2000));
+
+        $candidates = $query
+            ->select([$model->getKeyName(), 'url', 'headers', 'payload'])
+            ->where(fn (Builder $q) => $q->whereRaw("{$payload} LIKE ?", [$like])->orWhere('url', 'like', $like))
+            ->orderByDesc($model->getKeyName())
+            ->limit($limit + 1)
+            ->get();
+
+        $this->searchLimited[$table] = $candidates->count() > $limit;
+        $masker = $this->masker();
+        $ids = [];
+
+        foreach ($candidates->take($limit) as $call) {
+            $haystack = json_encode($masker->payload($call->payload), JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE)
+                ."\n".$masker->url((string) $call->url);
+
+            if (mb_stripos((string) $haystack, $term) !== false) {
+                $ids[] = (string) $call->getKey();
+            }
+        }
+
+        return $this->searchIds[$table][$term] = $ids;
+    }
+
+    /** Whether the last search in $table had more candidates than search.scan_limit (older matches are left out). */
+    public function searchWasLimited(string $table): bool
+    {
+        return $this->searchLimited[$this->source($table)] ?? false;
+    }
+
+    /** Whether failed_jobs held more rows than failed_jobs.scan_limit, so older queue failures are not linked. */
+    public function failedJobsLimited(): bool
+    {
+        return $this->failedJobs->limitReached();
     }
 }

@@ -49,9 +49,9 @@ final class FailedCommand extends Command
                     'event' => $console->event($call),
                     'status' => $status->value,
                     'received_at' => $call->created_at?->toIso8601String(),
-                    'error' => $status === Status::Failed
+                    'error' => $console->maskText($call, $status === Status::Failed
                         ? (string) ($call->exception['message'] ?? '')
-                        : ($console->activeQueueFailure($call)?->message() ?? ''),
+                        : ($console->activeQueueFailure($call)?->message() ?? '')),
                 ];
             }
         }
@@ -59,7 +59,11 @@ final class FailedCommand extends Command
         $problem = $console->failedJobsProblem();
 
         if ($this->option('json')) {
-            $this->line((string) json_encode(['failed_jobs_read' => $problem === null, 'calls' => $rows], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
+            $this->line((string) json_encode([
+                'failed_jobs_read' => $problem === null,
+                'failed_jobs_limited' => $console->failedJobsLimited(),
+                'calls' => $rows,
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
         } elseif ($rows === []) {
             $this->components->info('No failed webhook calls'.($filters->from !== null ? ' since '.$filters->from->toDateTimeString() : '').'.');
         } else {
@@ -79,6 +83,8 @@ final class FailedCommand extends Command
 
         if ($problem !== null && ! $this->option('json')) {
             $this->components->warn("Queue failures not included: {$problem}");
+        } elseif ($console->failedJobsLimited() && ! $this->option('json')) {
+            $this->components->warn('Only the newest '.(int) config('webhook-console.failed_jobs.scan_limit', 1000).' failed_jobs rows were checked; older queue failures are not listed. Raise webhook-console.failed_jobs.scan_limit or run queue:prune-failed.');
         }
 
         return $this->option('strict') && $rows !== [] ? self::FAILURE : self::SUCCESS;

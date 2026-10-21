@@ -18,13 +18,76 @@ final class Masker
     /**
      * @param  list<string>  $words
      * @param  list<string>  $headers  exact header names to mask as well (signature headers)
+     * @param  list<string>  $secrets  values hidden wherever they appear in free text (signing secrets)
      */
-    public function __construct(array $words, private readonly array $headers = [])
+    public function __construct(array $words, private readonly array $headers = [], private readonly array $secrets = [])
     {
         $this->words = array_values(array_filter(array_map(
             fn (string $w): string => strtolower(trim($w)),
             $words,
         ), fn (string $w): bool => $w !== ''));
+    }
+
+    /**
+     * The secret values stored with one call: scalars under secret payload keys, secret headers and
+     * secret URL parameters. Free text (exception messages, traces) is masked against these.
+     *
+     * @param  array<array-key, mixed>|null  $payload
+     * @param  array<array-key, mixed>|null  $headers
+     * @return list<string>
+     */
+    public function secretsOf(?array $payload, ?array $headers, string $url = ''): array
+    {
+        $found = [];
+
+        $walk = function (mixed $data, bool $secret) use (&$walk, &$found): void {
+            if (is_array($data)) {
+                foreach ($data as $key => $value) {
+                    $walk($value, $secret || $this->isSecret($key));
+                }
+            } elseif ($secret && is_scalar($data)) {
+                $found[] = (string) $data;
+            }
+        };
+
+        $walk($payload ?? [], false);
+
+        $signature = array_map('strtolower', $this->headers);
+        foreach ($headers ?? [] as $name => $values) {
+            $walk($values, $this->isSecret($name) || in_array(strtolower((string) $name), $signature, true));
+        }
+
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $query);
+        $walk($query, false);
+
+        return array_values(array_unique(array_filter($found, fn (string $v): bool => strlen($v) >= 4)));
+    }
+
+    /**
+     * Masks free text such as an exception message or stack trace: every known secret value, any
+     * "secret_key=value", "secret_key: value" or "\"secret_key\":\"value\"" pair, and bearer tokens.
+     *
+     * @param  list<string>  $secrets  extra values to hide, usually secretsOf() for the call
+     */
+    public function text(string $text, array $secrets = []): string
+    {
+        $values = array_values(array_unique(array_filter([...$this->secrets, ...$secrets], fn (string $v): bool => strlen($v) >= 4)));
+        usort($values, fn (string $a, string $b): int => strlen($b) <=> strlen($a)); // longest first
+
+        if ($values !== []) {
+            $text = str_replace($values, self::MASK, $text);
+        }
+
+        if ($this->words !== []) {
+            $words = implode('|', array_map(fn (string $w): string => preg_quote($w, '/'), $this->words));
+            $text = (string) preg_replace(
+                '/((?:[\w.-]*(?:'.$words.')[\w.-]*)["\']?\s*[:=]\s*["\']?)(?!'.preg_quote(self::MASK, '/').')[^\s"\'&,;}\]]+/iu',
+                '$1'.self::MASK,
+                $text,
+            );
+        }
+
+        return (string) preg_replace('/\b(Bearer|Basic)\s+[A-Za-z0-9._~+\/=-]{4,}/', '$1 '.self::MASK, $text);
     }
 
     public function isSecret(string|int $key): bool

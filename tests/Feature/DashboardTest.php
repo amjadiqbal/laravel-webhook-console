@@ -31,7 +31,7 @@ it('denies the dashboard outside the local environment by default', function () 
 });
 
 it('lists calls with their config, event and status locally', function () {
-    $this->asLocal();
+    $this->asOperator();
     storeCall(['payload' => ['type' => 'invoice.paid']]);
     storeCall(['name' => 'github', 'payload' => ['action' => 'opened'], 'exception' => ['code' => 0, 'message' => 'Boom from GitHub', 'trace' => '#0']]);
 
@@ -45,7 +45,7 @@ it('lists calls with their config, event and status locally', function () {
 });
 
 it('filters by config name, status, date and payload search', function () {
-    $this->asLocal();
+    $this->asOperator();
     storeCall(['payload' => ['type' => 'invoice.paid', 'id' => 'evt_AAA']]);
     storeCall(['name' => 'github', 'payload' => ['action' => 'closed', 'id' => 'evt_BBB'], 'exception' => ['code' => 0, 'message' => 'x', 'trace' => '']]);
     $old = storeCall(['payload' => ['type' => 'very.old', 'id' => 'evt_CCC']]);
@@ -59,7 +59,7 @@ it('filters by config name, status, date and payload search', function () {
 });
 
 it('shows payload and headers with secrets masked', function () {
-    $this->asLocal();
+    $this->asOperator();
     $call = storeCall([
         'url' => 'https://app.test/webhooks/default?token=url-secret-value',
         'headers' => ['signature' => ['sig-secret-value'], 'authorization' => ['Bearer auth-secret-value'], 'user-agent' => ['Stripe/1.0']],
@@ -79,13 +79,13 @@ it('shows payload and headers with secrets masked', function () {
 });
 
 it('returns 404 for an unknown call and when the dashboard is off', function () {
-    $this->asLocal();
+    $this->asOperator();
 
     $this->get('/webhook-console/calls/999')->assertNotFound();
 });
 
 it('replays one call by dispatching its configured job again', function () {
-    $this->asLocal();
+    $this->asOperator();
     $call = storeCall(['exception' => ['code' => 0, 'message' => 'old failure', 'trace' => '']]);
 
     $this->from('/webhook-console/calls/'.$call->id)
@@ -98,7 +98,7 @@ it('replays one call by dispatching its configured job again', function () {
 });
 
 it('stores the exception again when a replay fails on the sync queue', function () {
-    $this->asLocal();
+    $this->asOperator();
     config()->set('webhook-client.configs', [TestCase::endpoint('default', ThrowingJob::class)]);
     app()->forgetScopedInstances();
     $call = storeCall();
@@ -110,7 +110,7 @@ it('stores the exception again when a replay fails on the sync queue', function 
 });
 
 it('refuses to replay a call whose config is gone or has no job', function () {
-    $this->asLocal();
+    $this->asOperator();
     $orphan = storeCall(['name' => 'removed']);
 
     $this->post("/webhook-console/calls/{$orphan->id}/replay")
@@ -120,7 +120,7 @@ it('refuses to replay a call whose config is gone or has no job', function () {
 });
 
 it('bulk-retries every failure matching the filters, oldest first', function () {
-    $this->asLocal();
+    $this->asOperator();
     $a = storeCall(['exception' => ['code' => 0, 'message' => 'a', 'trace' => '']]);
     storeCall();
     $c = storeCall(['exception' => ['code' => 0, 'message' => 'c', 'trace' => '']]);
@@ -132,7 +132,7 @@ it('bulk-retries every failure matching the filters, oldest first', function () 
 });
 
 it('replays only the selected calls', function () {
-    $this->asLocal();
+    $this->asOperator();
     storeCall();
     $b = storeCall();
 
@@ -143,7 +143,7 @@ it('replays only the selected calls', function () {
 });
 
 it('prunes calls older than the given days', function () {
-    $this->asLocal();
+    $this->asOperator();
     $old = storeCall();
     $old->forceFill(['created_at' => now()->subDays(10)])->save();
     $oldOther = storeCall(['name' => 'github']);
@@ -159,7 +159,7 @@ it('prunes calls older than the given days', function () {
 });
 
 it('keeps replay and prune behind their own gates', function () {
-    $this->asLocal();
+    $this->asOperator();
     Gate::define('replayWebhookCalls', fn ($user = null) => false);
     Gate::define('pruneWebhookCalls', fn ($user = null) => false);
     $call = storeCall(['exception' => ['code' => 0, 'message' => 'x', 'trace' => '']]);

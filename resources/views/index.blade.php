@@ -14,6 +14,12 @@
 
     @if ($failedJobsProblem)
         <div class="note">Queue failures are not shown: {{ $failedJobsProblem }} Calls whose job threw on a queue worker look like "No error" here.</div>
+    @elseif ($console->failedJobsLimited())
+        <div class="note">failed_jobs holds more than {{ number_format((int) config('webhook-console.failed_jobs.scan_limit', 1000)) }} rows and only the newest were checked: older queue failures show as "No error". Raise failed_jobs.scan_limit, or clear old rows with <code>php artisan queue:prune-failed</code>.</div>
+    @endif
+
+    @if ($filters->search !== null && $console->searchWasLimited($source))
+        <div class="note">The search matched more than {{ number_format((int) config('webhook-console.search.scan_limit', 2000)) }} calls; only the newest of them were checked. Narrow it with a config, status or date filter.</div>
     @endif
 
     <form class="filters" method="get" action="{{ route('webhook-console.index') }}">
@@ -57,7 +63,7 @@
                     <button class="btn primary" type="submit" name="all" value="1"
                             onclick="document.querySelectorAll('input[name=&quot;ids[]&quot;]').forEach(function (c) { c.checked = false; }); return confirm('Replay up to {{ $bulkLimit }} failed calls matching these filters?')">Retry failed</button>
                 @else
-                    <span class="muted" style="font-size:13.5px">Read-only: the replayWebhookCalls gate denies replay for you.</span>
+                    <span class="muted" style="font-size:13.5px">Read-only: replay needs a signed-in user whom the replayWebhookCalls gate allows.</span>
                 @endif
             </div>
             <span class="muted" style="font-size:13.5px">{{ number_format($calls->total()) }} {{ $calls->total() === 1 ? 'call' : 'calls' }}</span>
@@ -84,8 +90,8 @@
                         @php
                             $status = $console->status($call);
                             $error = match ($status) {
-                                \AmjadIqbal\WebhookConsole\Status::Failed => is_array($call->exception) ? (string) ($call->exception['message'] ?? '') : '',
-                                \AmjadIqbal\WebhookConsole\Status::QueueFailed => $console->activeQueueFailure($call)?->message() ?? '',
+                                \AmjadIqbal\WebhookConsole\Status::Failed => is_array($call->exception) ? $console->maskText($call, (string) ($call->exception['message'] ?? '')) : '',
+                                \AmjadIqbal\WebhookConsole\Status::QueueFailed => $console->maskText($call, $console->activeQueueFailure($call)?->message() ?? ''),
                                 default => '',
                             };
                             $link = route('webhook-console.show', ['id' => $call->getKey(), ...$base]);

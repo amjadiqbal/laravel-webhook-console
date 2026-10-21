@@ -10,13 +10,12 @@ use AmjadIqbal\WebhookConsole\ReplayResult;
 use AmjadIqbal\WebhookConsole\WebhookConsole;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Gate;
 
 final class ActionController
 {
     public function replay(Request $request, WebhookConsole $console, Replayer $replayer, string $id): RedirectResponse
     {
-        abort_unless(Gate::check('replayWebhookCalls', [$request]), 403);
+        abort_unless(Authorize::allowsAction($request, 'replayWebhookCalls'), 403);
 
         $source = $console->source($request->input('source') !== null ? (string) $request->input('source') : null);
         $call = $console->find($source, $id);
@@ -33,7 +32,7 @@ final class ActionController
 
     public function retry(Request $request, WebhookConsole $console, Replayer $replayer): RedirectResponse
     {
-        abort_unless(Gate::check('replayWebhookCalls', [$request]), 403);
+        abort_unless(Authorize::allowsAction($request, 'replayWebhookCalls'), 403);
 
         $source = $console->source($request->input('source') !== null ? (string) $request->input('source') : null);
         $limit = max(1, (int) config('webhook-console.bulk_limit', 100));
@@ -67,7 +66,7 @@ final class ActionController
 
     public function prune(Request $request, WebhookConsole $console): RedirectResponse
     {
-        abort_unless(Gate::check('pruneWebhookCalls', [$request]), 403);
+        abort_unless(Authorize::allowsAction($request, 'pruneWebhookCalls'), 403);
 
         $data = $request->validate([
             'days' => ['required', 'integer', 'min:1', 'max:36500'],

@@ -16,7 +16,7 @@ beforeEach(function () {
 it('replays a call through its config\'s custom webhook_model', function () {
     config()->set('webhook-client.configs', [TestCase::endpoint('default', CustomCallJob::class, CustomCall::class)]);
     app()->forgetScopedInstances();
-    $this->asLocal();
+    $this->asOperator();
 
     $this->sendWebhook(['type' => 'custom'])->assertOk();
     expect(CustomCallJob::$classes)->toBe([CustomCall::class]);
@@ -33,7 +33,7 @@ it('shows each table as its own source when models use different tables', functi
         TestCase::endpoint('other', CustomCallJob::class, OtherTableCall::class),
     ]);
     app()->forgetScopedInstances();
-    $this->asLocal();
+    $this->asOperator();
 
     $this->sendWebhook(['type' => 'in.default'], 'default')->assertOk();
     $this->sendWebhook(['type' => 'in.other'], 'other')->assertOk();
@@ -53,7 +53,7 @@ it('shows each table as its own source when models use different tables', functi
 it('works with the published default config, whose process_webhook_job is empty', function () {
     config()->set('webhook-client.configs', [[...TestCase::endpoint('default', RecordingJob::class), 'process_webhook_job' => '']]);
     app()->forgetScopedInstances();
-    $this->asLocal();
+    $this->asOperator();
     $call = WebhookCall::create(['name' => 'default', 'url' => 'u', 'payload' => ['type' => 'x']]);
 
     $this->get("/webhook-console/calls/{$call->id}")->assertOk()->assertSee('has no process_webhook_job');

@@ -4,8 +4,10 @@ namespace AmjadIqbal\WebhookConsole\Tests;
 
 use AmjadIqbal\WebhookConsole\Tests\Fixtures\RecordingJob;
 use AmjadIqbal\WebhookConsole\WebhookConsoleServiceProvider;
+use Illuminate\Auth\GenericUser;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Testing\TestResponse;
@@ -127,6 +129,15 @@ abstract class TestCase extends Orchestra
             'Signature' => hash_hmac('sha256', $body, 'secret'),
             ...$headers,
         ]), $body);
+    }
+
+    /** Local, signed in, and allowed to replay and prune (both gates deny by default). */
+    protected function asOperator(): void
+    {
+        $this->asLocal();
+        $this->actingAs(new GenericUser(['id' => 1, 'name' => 'Operator']));
+        Gate::define('replayWebhookCalls', fn ($user) => true);
+        Gate::define('pruneWebhookCalls', fn ($user) => true);
     }
 
     /** Local environment; CSRF is then enforced like in a real app, so these tests opt out of it. */

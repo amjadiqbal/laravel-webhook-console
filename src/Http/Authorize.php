@@ -17,4 +17,17 @@ final class Authorize
 
         return $next($request);
     }
+
+    /**
+     * Whether the request may use a write action (replay or prune): the action's gate must allow it
+     * and, unless dashboard.actions_require_user is false, someone must be signed in.
+     */
+    public static function allowsAction(Request $request, string $gate): bool
+    {
+        if (config('webhook-console.dashboard.actions_require_user', true) && $request->user() === null) {
+            return false;
+        }
+
+        return Gate::check($gate, [$request]);
+    }
 }

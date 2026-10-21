@@ -29,6 +29,8 @@ final class FailedJobs
 
     private bool $checked = false;
 
+    private bool $limitReached = false;
+
     public function __construct(
         private readonly Config $config,
         private readonly DatabaseManager $db,
@@ -82,11 +84,17 @@ final class FailedJobs
         }
 
         $failures = [];
+        $limit = max(1, (int) $this->config->get('webhook-console.failed_jobs.scan_limit', 1000));
         $rows = $this->db->connection($this->config->get('queue.failed.database'))
             ->table($this->failedTable())
             ->orderByDesc('failed_at')
-            ->limit(max(1, (int) $this->config->get('webhook-console.failed_jobs.scan_limit', 1000)))
+            ->limit($limit + 1)
             ->get();
+
+        if ($rows->count() > $limit) {
+            $this->limitReached = true;
+            $rows = $rows->take($limit);
+        }
 
         foreach ($rows as $row) {
             $row = (array) $row;
@@ -107,6 +115,12 @@ final class FailedJobs
         }
 
         return $this->byTable[$table] = $failures;
+    }
+
+    /** True once a scan found more failed_jobs rows than failed_jobs.scan_limit. */
+    public function limitReached(): bool
+    {
+        return $this->limitReached;
     }
 
     public function forCall(WebhookCall $call): ?QueueFailure

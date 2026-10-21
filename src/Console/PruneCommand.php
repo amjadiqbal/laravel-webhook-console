@@ -38,7 +38,7 @@ final class PruneCommand extends Command
         }
 
         $total = array_sum($counts);
-        $what = "{$total} ".($total === 1 ? 'call' : 'calls')." older than {$days} days".($name !== null ? " for '{$name}'" : '');
+        $what = "{$total} ".($total === 1 ? 'call' : 'calls')." older than {$days} ".($days === 1 ? 'day' : 'days').($name !== null ? " for '{$name}'" : '');
 
         if ($total === 0 || $this->option('pretend')) {
             $this->components->info(($this->option('pretend') ? 'Would delete ' : 'Nothing to delete: ').$what.'.');
@@ -57,7 +57,7 @@ final class PruneCommand extends Command
             $deleted += $console->prune($table, $days, $name);
         }
 
-        $this->components->info("Deleted {$deleted} ".($deleted === 1 ? 'call' : 'calls')." older than {$days} days".($name !== null ? " for '{$name}'" : '').'.');
+        $this->components->info("Deleted {$deleted} ".($deleted === 1 ? 'call' : 'calls')." older than {$days} ".($days === 1 ? 'day' : 'days').($name !== null ? " for '{$name}'" : '').'.');
 
         return self::SUCCESS;
     }

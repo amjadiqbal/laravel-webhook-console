@@ -19,7 +19,7 @@
     @endif
 
     @if ($filters->search !== null && $console->searchWasLimited($source))
-        <div class="note">The search matched more than {{ number_format((int) config('webhook-console.search.scan_limit', 2000)) }} calls; only the newest of them were checked. Narrow it with a config, status or date filter.</div>
+        <div class="note">Only the newest matches were checked, so older calls may be missing from this search. Narrow it with a config, status or date filter.</div>
     @endif
 
     <form class="filters" method="get" action="{{ route('webhook-console.index') }}">

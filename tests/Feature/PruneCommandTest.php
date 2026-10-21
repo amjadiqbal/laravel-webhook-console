@@ -46,3 +46,9 @@ it('refuses without a usable number of days', function () {
     $this->artisan('webhooks:prune --force')->assertExitCode(2);
     $this->artisan('webhooks:prune --days=0 --force')->assertExitCode(2);
 });
+
+it('says "1 day", not "1 days"', function () {
+    agedCall(3);
+
+    $this->artisan('webhooks:prune --days=1 --pretend')->expectsOutputToContain('Would delete 1 call older than 1 day.')->assertSuccessful();
+});

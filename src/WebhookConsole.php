@@ -347,7 +347,7 @@ final class WebhookConsole
             ->limit($limit + 1)
             ->get();
 
-        $this->searchLimited[$table] = $candidates->count() > $limit;
+        $limited = $candidates->count() > $limit;
         $masker = $this->masker();
         $ids = [];
 
@@ -360,10 +360,17 @@ final class WebhookConsole
             }
         }
 
+        // The raw candidate count includes rows that only matched inside a secret, so it must not show:
+        // the limit notice appears only when the search also found something visible.
+        $this->searchLimited[$table] = $limited && $ids !== [];
+
         return $this->searchIds[$table][$term] = $ids;
     }
 
-    /** Whether the last search in $table had more candidates than search.scan_limit (older matches are left out). */
+    /**
+     * Whether the last search in $table may have left older matches out: the database returned more than
+     * search.scan_limit candidates and at least one visible match was found. Says nothing about how many.
+     */
     public function searchWasLimited(string $table): bool
     {
         return $this->searchLimited[$this->source($table)] ?? false;

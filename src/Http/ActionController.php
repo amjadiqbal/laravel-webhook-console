@@ -79,7 +79,7 @@ final class ActionController
 
         return back()->with('webhook-console.flash', [
             'type' => 'ok',
-            'message' => "Deleted {$deleted} ".($deleted === 1 ? 'call' : 'calls')." older than {$data['days']} days".($name !== null ? " for '{$name}'" : '').'.',
+            'message' => "Deleted {$deleted} ".($deleted === 1 ? 'call' : 'calls')." older than {$data['days']} ".((int) $data['days'] === 1 ? 'day' : 'days').($name !== null ? " for '{$name}'" : '').'.',
         ]);
     }
 }

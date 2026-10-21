@@ -1,8 +1,10 @@
 <?php
 
 use AmjadIqbal\WebhookConsole\Masker;
+use AmjadIqbal\WebhookConsole\Tests\Fixtures\LeakyJob;
 use AmjadIqbal\WebhookConsole\Tests\Fixtures\RecordingJob;
 use AmjadIqbal\WebhookConsole\Tests\Fixtures\ThrowingJob;
+use AmjadIqbal\WebhookConsole\Tests\TestCase;
 use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
@@ -141,4 +143,35 @@ it('masks free text by value, by key=value pair and by bearer token', function (
         ->toBe('rejected (password='.Masker::MASK.', Authorization: Bearer '.Masker::MASK.', authorization=Basic '.Masker::MASK.')')
         ->and($masker->secretsOf(['a' => ['password' => 'p_1234'], 'b' => 'visible'], ['x-token' => ['t_1234']], 'https://x.test/?api_key=k_1234&b=2'))
         ->toBe(['p_1234', 't_1234', 'k_1234']);
+});
+
+it('masks the exception of a failed replay in the dashboard flash and in webhooks:replay', function () {
+    config()->set('webhook-client.configs', [TestCase::endpoint('default', LeakyJob::class)]);
+    app()->forgetScopedInstances();
+    $this->asOperator();
+    $call = secretCall(['exception' => null]);
+
+    $this->post("/webhook-console/calls/{$call->id}/replay")->assertSessionHas('webhook-console.flash.type', 'error');
+    $flash = session('webhook-console.flash.message');
+    expect($flash)->toContain('Gateway refused key')->not->toContain('sk_live_PAYLOADSECRET')->not->toContain('tok_LEAKY_BEARER');
+
+    $this->post('/webhook-console/retry', ['ids' => [(string) $call->id]]);
+    expect(session('webhook-console.flash.message'))->toContain('Gateway refused key')->not->toContain('sk_live_PAYLOADSECRET');
+
+    Artisan::call('webhooks:replay', ['ids' => [(string) $call->id], '--force' => true]);
+    expect(Artisan::output())->toContain('Gateway refused key')->not->toContain('sk_live_PAYLOADSECRET')->not->toContain('tok_LEAKY_BEARER');
+});
+
+it('never reveals how many raw rows a search matched', function () {
+    $this->asLocal();
+    config()->set('webhook-console.search.scan_limit', 1);
+    secretCall(['exception' => null]);
+    secretCall(['exception' => null]);
+
+    // Two raw candidates over a limit of 1, but only inside the secret: same page as a term that matches nothing.
+    $guess = $this->get('/webhook-console?q=sk_live_PAYLOADSECRET')->assertSee('No webhook calls match')->assertDontSee('Only the newest matches were checked');
+    $none = $this->get('/webhook-console?q=no_such_thing_anywhere')->assertSee('No webhook calls match')->assertDontSee('Only the newest matches were checked');
+
+    // A visible term over the limit gets the notice, without any count.
+    $this->get('/webhook-console?q=cus_visible')->assertSee('Only the newest matches were checked')->assertDontSee('more than 1');
 });

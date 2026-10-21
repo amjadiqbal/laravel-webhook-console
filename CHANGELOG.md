@@ -6,6 +6,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-21
+
+### Security
+- The exception of a failed replay (the dispatch exception's class and message) is now masked in the
+  dashboard flash message and in `webhooks:replay` output, like every other exception text.
+- Payload search no longer reveals how many raw rows matched. The "only the newest matches were checked"
+  notice carries no count, and it appears only when the search also found something visible, so a guessed
+  secret can't be confirmed through it.
+
+### Fixed
+- `webhooks:prune` and the dashboard's prune message say "1 day" instead of "1 days".
+
 ## [1.0.1] - 2026-10-21
 
 ### Security
@@ -54,6 +66,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 - Custom `webhook_model` support, including models with their own table.
 - `php artisan about` entry.
 
-[Unreleased]: https://github.com/amjadiqbal/laravel-webhook-console/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/amjadiqbal/laravel-webhook-console/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/amjadiqbal/laravel-webhook-console/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/amjadiqbal/laravel-webhook-console/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/amjadiqbal/laravel-webhook-console/releases/tag/v1.0.0

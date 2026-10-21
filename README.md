@@ -173,7 +173,7 @@ php artisan vendor:publish --tag=webhook-console-config
 | `mask` | password, secret, token, ... | words matched inside key and header names |
 | `failed_jobs.enabled` | `true` | read `failed_jobs` for queue failures |
 | `failed_jobs.scan_limit` | `1000` | newest `failed_jobs` rows read per request; the dashboard and `webhooks:failed` say so when there are more |
-| `search.scan_limit` | `2000` | newest matching calls checked per search; the dashboard says so when there are more |
+| `search.scan_limit` | `2000` | newest database candidates checked per search; when a search with visible results may be missing older ones, the dashboard says so (without a count) |
 | `bulk_limit` | `100` | the most calls one bulk retry replays |
 
 The views can be published with `--tag=webhook-console-views`.

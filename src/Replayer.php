@@ -47,7 +47,8 @@ final class Replayer
         } catch (Throwable $e) {
             $call->saveException($e instanceof Exception ? $e : new RuntimeException($e->getMessage(), (int) $e->getCode(), $e));
 
-            return ReplayResult::failed($call, $e::class.': '.$e->getMessage());
+            // Masked like every other exception text: the result reaches the dashboard flash and artisan output.
+            return ReplayResult::failed($call, $this->console->maskText($call, $e::class.': '.$e->getMessage()));
         }
 
         return ReplayResult::dispatched($call, $endpoint->jobClass);

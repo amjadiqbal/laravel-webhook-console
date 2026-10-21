@@ -22,7 +22,7 @@ Docs and demo: https://amjad.com.pk/laravel/packages/laravel-webhook-console
 [![License](https://img.shields.io/packagist/l/amjadiqbal/laravel-webhook-console.svg?style=flat-square)](LICENSE.md)
 
 <p align="center">
-  <img alt="The Webhook Console dashboard: webhook calls from three configs, two failures (one with a stored exception, one failed on the queue worker), filters by config, status, date and payload search, and Replay selected / Retry failed buttons" src="art/screenshot.png" width="100%">
+  <img alt="The Webhook Console dashboard: Stripe, GitHub, Shopify and Paddle webhook calls, two failures (one with a stored exception, one failed on the queue worker), filters by config, status, date and payload search, and Replay selected / Retry failed buttons" src="art/screenshot.png" width="100%">
 </p>
 
 ```bash

@@ -1,0 +1,84 @@
+{
+    "name": "amjadiqbal/laravel-webhook-console",
+    "description": "Dashboard and replay tool for spatie/laravel-webhook-client: browse every received webhook by config, status and date, inspect payloads and headers with secrets masked, see failures (stored exceptions and failed queue jobs), replay one or bulk-retry failed webhooks, prune old calls, plus webhooks:failed and webhooks:replay artisan commands.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "amjadiqbal",
+        "laravel",
+        "laravel-package",
+        "webhooks",
+        "webhook",
+        "webhook-client",
+        "spatie",
+        "laravel-webhook-client",
+        "webhook-dashboard",
+        "webhook-replay",
+        "webhook-retry",
+        "failed-jobs",
+        "queue",
+        "dashboard",
+        "debugging"
+    ],
+    "homepage": "https://amjad.com.pk/laravel/packages/laravel-webhook-console",
+    "authors": [
+        {
+            "name": "Amjad Iqbal",
+            "homepage": "https://amjad.com.pk",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/amjadiqbal/laravel-webhook-console/issues",
+        "source": "https://github.com/amjadiqbal/laravel-webhook-console",
+        "docs": "https://amjad.com.pk/laravel/packages/laravel-webhook-console"
+    },
+    "require": {
+        "php": "^8.3",
+        "illuminate/bus": "^12.0|^13.0",
+        "illuminate/console": "^12.0|^13.0",
+        "illuminate/contracts": "^12.0|^13.0",
+        "illuminate/database": "^12.0|^13.0",
+        "illuminate/http": "^12.0|^13.0",
+        "illuminate/routing": "^12.0|^13.0",
+        "illuminate/support": "^12.0|^13.0",
+        "illuminate/view": "^12.0|^13.0",
+        "spatie/laravel-webhook-client": "^3.4"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.0",
+        "orchestra/testbench": "^10.0|^11.0",
+        "pestphp/pest": "^3.0|^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "AmjadIqbal\\WebhookConsole\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "AmjadIqbal\\WebhookConsole\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "AmjadIqbal\\WebhookConsole\\WebhookConsoleServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "scripts": {
+        "test": "vendor/bin/pest",
+        "pint": "vendor/bin/pint --test",
+        "analyse": "vendor/bin/phpstan analyse --memory-limit=1G"
+    }
+}

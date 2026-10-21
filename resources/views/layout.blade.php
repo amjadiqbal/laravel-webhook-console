@@ -8,7 +8,7 @@
     <style>
         :root {
             --bg: #F8FAFC; --panel: #FFFFFF; --border: #E2E8F0; --text: #0F172A; --muted: #64748B; --soft: #F1F5F9;
-            --accent: #0891B2; --accent-text: #0E7490; --on-accent: #FFFFFF; --code-bg: #0F172A; --code-text: #E2E8F0; --code-key: #67E8F9;
+            --accent: #0E7490; --accent-text: #0E7490; --on-accent: #FFFFFF; --code-bg: #0F172A; --code-text: #E2E8F0; --code-key: #67E8F9;
             --critical: #DC2626; --critical-bg: #FEE2E2; --queue: #7C3AED; --queue-bg: #EDE9FE; --ok: #16A34A; --ok-bg: #DCFCE7;
         }
         @media (prefers-color-scheme: dark) {
